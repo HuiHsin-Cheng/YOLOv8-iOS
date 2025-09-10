@@ -13,7 +13,7 @@ struct BoxOverlay: View {
             let imgH  = max(vm.frameSize.height, 1)
 
             // Aspect Fill 計算：把原圖放大到充滿 view
-            let scale = max(viewW / imgW, viewH / imgH)
+            let scale = max(viewW / imgW, viewH / imgH) 
             let dispW = imgW * scale
             let dispH = imgH * scale
             let offX  = (viewW - dispW) / 2
