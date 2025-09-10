@@ -2,6 +2,11 @@
 
 這是一個基於 [YOLOv8](https://github.com/ultralytics/ultralytics) 物件偵測模型的 iOS App，支援即時相機推論與圖片上傳偵測。專案使用 **CoreML** 部署，並以 **SwiftUI + Vision + AVFoundation** 建立使用者介面。
 
+## 📱 Demo
+👉 [觀看 Kingston Detector Demo 影片]([https://youtu.be/ICmD30B0Lec](https://youtube.com/shorts/ICmD30B0Lec?feature=share))
+
+
+
 ## ✨ 功能特點
 - 📸 **即時相機偵測**：透過 iPhone 相機串流進行即時物件偵測  
 - 🖼️ **圖片上傳**：可從相簿選取圖片進行離線推論 (to-do)
