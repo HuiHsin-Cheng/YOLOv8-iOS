@@ -13,6 +13,10 @@ final class CameraManager: NSObject, ObservableObject {
         session.addInput(input)
         if session.canAddOutput(videoOutput) { videoOutput.alwaysDiscardsLateVideoFrames = true; videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]; session.addOutput(videoOutput) }
         session.commitConfiguration()
+        if let conn = self.videoOutput.connection(with: .video),
+           conn.isVideoOrientationSupported {
+            conn.videoOrientation = .portrait
+        }
     }
     func start() { if !session.isRunning { session.startRunning() } }
     func stop()  { if  session.isRunning { session.stopRunning() } }
@@ -26,6 +30,6 @@ final class PreviewView: UIView {
     override class var layerClass: AnyClass { AVCaptureVideoPreviewLayer.self }
     var session: AVCaptureSession? { get { previewLayer.session } set { previewLayer.session = newValue } }
     var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
-    override init(frame: CGRect) { super.init(frame: frame); previewLayer.videoGravity = .resizeAspectFill }
+    override init(frame: CGRect) { super.init(frame: frame); previewLayer.videoGravity = .resizeAspectFill; previewLayer.connection?.videoOrientation = .portrait }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 }

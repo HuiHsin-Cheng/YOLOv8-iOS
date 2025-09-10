@@ -15,6 +15,11 @@ final class DetectionViewModel: NSObject, ObservableObject, AVCaptureVideoDataOu
     @Published var drawBoxes: Bool = true
     @Published var confidenceThreshold: Double = 0.25
     @Published var computeUnit: MLComputeUnits = .all
+    @Published var visionOrientation: CGImagePropertyOrientation = .right {
+        didSet { _visionOrientationUnsafe = visionOrientation }
+    }
+    private nonisolated(unsafe) var _visionOrientationUnsafe: CGImagePropertyOrientation = .right
+
     @Published var frameSize: CGSize = .zero
 
     let camera = CameraManager()
@@ -73,29 +78,44 @@ final class DetectionViewModel: NSObject, ObservableObject, AVCaptureVideoDataOu
         guard let selfReq = self.req, _isLiveUnsafe else { return }
         guard let pixel = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
+        // 更新原始影像尺寸（給 Overlay 做正確等比換算）
         let w = CVPixelBufferGetWidth(pixel)
         let h = CVPixelBufferGetHeight(pixel)
         Task { @MainActor in self.frameSize = CGSize(width: w, height: h) }
 
+        // 可選：保存最近一幀（如果需要拍照疊框）
         let ci = CIImage(cvPixelBuffer: pixel)
         if let cg = ciContext.createCGImage(ci, from: ci.extent) { self.lastCGImage = cg }
 
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixel, orientation: .right, options: [:])
+        // 用鏡像的非隔離方向值，避免觸碰 @MainActor 屬性
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixel,
+                                            orientation: _visionOrientationUnsafe,
+                                            options: [:])
         do { try handler.perform([selfReq]) } catch { print("VN perform error:", error) }
 
+        // FPS（可保留）
         let now = CFAbsoluteTimeGetCurrent()
         let dt = now - self.lastTimestamp
         self.lastTimestamp = now
         if dt > 0 { Task { @MainActor in self.fps = min(120, 1.0 / dt) } }
     }
 
+
     func runOnImage(_ image: UIImage) {
         guard let cg = image.cgImage, let req else { return }
+
+        // 直立拍攝預設 .right；若你會偵測旋轉，外部更新 visionOrientation 即可
+        visionOrientation = .right
+
         Task { @MainActor in self.frameSize = CGSize(width: cg.width, height: cg.height) }
         self.lastCGImage = cg
-        let handler = VNImageRequestHandler(cgImage: cg, orientation: .right, options: [:])
+
+        let handler = VNImageRequestHandler(cgImage: cg,
+                                            orientation: _visionOrientationUnsafe,
+                                            options: [:])
         do { try handler.perform([req]) } catch { print("VN perform error:", error) }
     }
+
 
     private func handleObservations(_ results: [Any]) {
         var preds: [Prediction] = []
