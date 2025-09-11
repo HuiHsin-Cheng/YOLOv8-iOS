@@ -9,8 +9,16 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            CameraView(session: vm.camera.session)
-                .ignoresSafeArea()
+            // ✅ 有圖就顯示圖片；否則顯示相機
+            if let img = pickedImage {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFill()
+                    .ignoresSafeArea()
+            } else {
+                CameraView(session: vm.camera.session)
+                    .ignoresSafeArea()
+            }
 
             BoxOverlay(predictions: vm.predictions)
                 .environmentObject(vm)
@@ -49,16 +57,27 @@ struct ContentView: View {
                 .background(.ultraThinMaterial)
             }
         }
+        // ✅ 選到圖片後：停相機、切非 Live、跑單張推論
+        .onChange(of: pickedImage) { img in
+            guard let img else { return }
+            vm.stop()
+            vm.isLive = false
+            vm.runOnImage(img)
+        }
+        // ✅ 切回 Live：清圖片並啟動相機；Pause：停止相機
+        .onChange(of: vm.isLive) { on in
+            if on {
+                pickedImage = nil
+                vm.start()
+            } else {
+                vm.stop()
+            }
+        }
         .sheet(isPresented: $showSettings) {
             SettingsView().environmentObject(vm)
         }
         .sheet(isPresented: $showGalleryPicker) {
-            ImagePicker(image: $pickedImage)
-                .onDisappear {
-                    if let img = pickedImage {
-                        vm.runOnImage(img)
-                    }
-                }
+            ImagePicker(image: $pickedImage)   // 選圖後會觸發上面的 onChange
         }
         .task {
             await vm.camera.configure()
@@ -67,6 +86,31 @@ struct ContentView: View {
         }
     }
 }
+
+// MARK: - Preview
+
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        let vm = DetectionViewModel()
+        vm.isLive = false
+        vm.frameSize = CGSize(width: 1080, height: 1920)
+        vm.summary = [
+            DetectionSummary(label: "other", confidence: 0.92),
+            DetectionSummary(label: "kingston", confidence: 0.81)
+        ]
+        vm.predictions = [
+            Prediction(rect: CGRect(x: 0.15, y: 0.55, width: 0.35, height: 0.25),
+                       label: "other", confidence: 0.92, color: .green),
+            Prediction(rect: CGRect(x: 0.50, y: 0.25, width: 0.30, height: 0.22),
+                       label: "kingston", confidence: 0.85, color: .red)
+        ]
+        return ContentView().environmentObject(vm)
+    }
+}
+
+
+
+
 
 private struct TopBar: View {
     let fpsText: String
@@ -96,29 +140,6 @@ private struct TopBar: View {
     }
 }
 
-private struct DetectionPanel: View {
-    let items: [DetectionSummary]
-
-    var body: some View {
-        VStack(alignment: .trailing, spacing: 4) {
-            Text("Detections")
-                .font(.caption2)
-                .foregroundStyle(.white.opacity(0.9))
-            ForEach(items) { s in
-                HStack(spacing: 8) {
-                    Text(s.label).lineLimit(1)
-                    Text("\(Int(s.confidence * 100))%").opacity(0.8)
-                }
-                .font(.caption2)
-                .foregroundStyle(.white)
-            }
-        }
-        .padding(8)
-        .background(Color.black.opacity(0.35))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-}
-
 private struct BottomControls: View {
     @Binding var isLive: Bool
     var onClear: () -> Void
@@ -144,16 +165,27 @@ private struct BottomControls: View {
     }
 }
 
-// MARK: - Preview
+private struct DetectionPanel: View {
+    let items: [DetectionSummary]
 
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        let vm = DetectionViewModel()
-        vm.summary = [
-            DetectionSummary(label: "other", confidence: 0.92),
-            DetectionSummary(label: "kingston", confidence: 0.81)
-        ]
-        return ContentView()
-            .environmentObject(vm)
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            Text("Detections")
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.9))
+            ForEach(items) { s in
+                HStack(spacing: 8) {
+                    Text(s.label).lineLimit(1)
+                    Text("\(Int(s.confidence * 100))%").opacity(0.8)
+                }
+                .font(.caption2)
+                .foregroundStyle(.white)
+            }
+        }
+        .padding(8)
+        .background(Color.black.opacity(0.35))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
+
+
